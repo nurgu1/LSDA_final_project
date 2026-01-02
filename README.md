@@ -57,8 +57,23 @@ df_scored = df_calc.withColumn("risk_score",
     (when(col("scheduled_arr") > "18:00", 10).otherwise(0)) # Factor 3: Solar/Night Cycle (Computed Logic)
 )
 ```
-## 6. Analytical Findings
-** Finding #1:** Day vs. Night Operational Risk
+## 7. Key Performance Indicators (KPIs) & Validation
+
+### KPI 1: Operational Action ("The Red Alert List")
+* **Goal:** Provide Operations teams with a prioritized list of specific flights requiring immediate intervention.
+* **SQL Query:**
+    ```sql
+    SELECT flight_id, origin, destination, risk_score, prediction, 
+           CASE WHEN risk_score > 40 THEN 'Review Weather & Crew' ELSE 'Standard Ops' END as action
+    FROM risk_report
+    ORDER BY risk_score DESC LIMIT 10;
+    ```
+* **Result (Evidence):** The query successfully identified specific flights (e.g., flight `DL109`) with **Risk Scores > 40**, flagging them for "Review Weather & Crew".
+* **Verdict:** **Satisfied.** The system replaces manual guessing with a concrete, actionable checklist for the Operations Control Center.
+ ![Results_second](screenshots/first_query.png)
+
+
+**Finding #1:** Day vs. Night Operational Risk
 **Objective:** Statistically validate the impact of the Solar/Night logic on operational safety.
 
 **Hypothesis:** Flights operating post-sunset carry higher operational risk due to reduced visibility and temperature drops.
@@ -85,3 +100,10 @@ Day Operations carry an Average Risk Score of 13.5.
 This 61% increase in risk during night operations proves that visibility and temperature drops (derived from the Solar/Weather APIs) are critical drivers of potential delays. Operations teams should prioritize the 121 'Critical Alerts' identified in the night block.
 
  ![Results_first](screenshots/first_query.png)
+
+
+ 
+**Finding #2:** Weather Sensitivity
+**Objective:** Prove the model is dynamic and responds to real-world environmental changes.
+
+```SQL
