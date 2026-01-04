@@ -61,9 +61,9 @@ The project implementation followed a strict CI/CD workflow.
     ```python
     # Logic defining the Multi-Variate Risk Score
     df_scored = df_calc.withColumn("risk_score",
-        (when(col("plane_age") > 20, 30).otherwise(0)) +      # Fleet Penalty
-        (when(col("windspeed") > 15, 40).otherwise(0)) +      # Weather Penalty
-        (when(col("scheduled_arr") > "18:00", 10).otherwise(0)) # Night Penalty
+        (when(col("plane_age") > 20, 30).otherwise(0)) +    
+        (when(col("windspeed") > 15, 40).otherwise(0)) + 
+        (when(col("scheduled_arr") > "18:00", 10).otherwise(0)) 
     )
     ```
 * `athena_queries.sql`: The SQL queries used to extract the KPIs above.
