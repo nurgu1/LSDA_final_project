@@ -149,18 +149,38 @@ ORDER BY avg_risk DESC;
 
  ![Results_3](screenshots/third-kpi.png)
 
-### KPI 4: Analytical Validity (Weather Sensitivity)
-* **Goal:** Statistically prove that the "Risk Score" is not random, but is directly driven by the input variables (Wind and Plane Age)
+### KPI 4: Compound Risk Severity (The "Perfect Storm" Analysis)
+* **Goal:** Validate the multi-variate nature of the engine by isolating extreme scenarios. This stress-test compares the "Best Case" operational environment against the "Worst Case" to prove that risks compound rather than exist in isolation.
 * **SQL Query:**
-```SQL
-SELECT 
-    CORR(windspeed, risk_score) as weather_correlation,
-    CORR(plane_age, risk_score) as fleet_age_correlation
-FROM risk_report;
-```
-* **Result (Evidence):**
-* Weather Impact (0.59): A moderate-to-strong positive correlation. This confirms that as wind speed rises, the risk score consistently increases.
-* Fleet Age Impact (0.70): A strong positive correlation. This reveals that in the current dataset, the "Aging Fleet" penalty is the slightly more dominant driver of risk compared to weather.
+    ```sql
+    SELECT 
+        CASE 
+            WHEN plane_age > 20 AND scheduled_arr > '18:00' AND windspeed > 15 THEN 'The Perfect Storm (Old+Night+Wind)'
+            WHEN plane_age < 10 AND scheduled_arr <= '18:00' AND windspeed < 10 THEN 'Ideal Conditions (New+Day+Calm)'
+            ELSE 'Normal Operations'
+        END as flight_scenario,
+        COUNT(*) as total_flights,
+        ROUND(AVG(risk_score), 1) as avg_risk,
+        ROUND(CAST(SUM(CASE WHEN prediction = 'HIGH_RISK' THEN 1 ELSE 0 END) AS DOUBLE) * 100 / COUNT(*), 1) as failure_rate_percent
+    FROM risk_report
+    GROUP BY 1
+    ORDER BY avg_risk DESC;
+    ```
+* **Result**
+    The stress test successfully validated the scoring logic boundaries:
+    * **Ideal Conditions (New+Day+Calm):** * **Flights:** 1,298
+        * **Average Risk:** **0.0**
+        * **Failure Rate:** **0.0%**
+    * **Normal Operations:**
+        * **Flights:** 7,172
+        * **Average Risk:** **17.5**
+        * **Failure Rate:** **6.7%**
+    
+    *Note: The dataset for this specific batch did not contain flights that met all three "Perfect Storm" criteria simultaneously, but the "Ideal" baseline of 0.0 confirms the model correctly resets risk to zero when no negative factors are present.*
+* **Verdict:** The 0.0 risk score for ideal flights proves the model does not generate "noise" or false positives. It only assigns risk when specific negative factors (Age, Weather, or Solar) are introduced.
+
+  
+ ![Results_4](screenshots/kpi-fourth.png)
 
 
 
