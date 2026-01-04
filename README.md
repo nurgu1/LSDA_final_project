@@ -10,77 +10,118 @@ By automating the ingestion of live weather and solar data and joining it with i
 ## 2. Business Value & Problem Statement
 * **The Problem:** Legacy flight tracking systems often fail to account for the "compounding risk" of aging aircraft operating in marginal weather conditions or during low-visibility night operations.
 * **The Solution:** An automated "Lakehouse" architecture that merges static internal data with dynamic external APIs.
-* **Business Impact:**
-    * **Operational:** Automates "Red Alert" actions for high-risk flights.
-    * **Strategic:** Identifies vulnerability in aging fleet assets to support renewal decisions.
-    * **Analytical:** Statistically validates the impact of environmental factors (Wind & Night Operations) on flight safety.
+* **Target Audience:**
+* *Operations Control Center (OCC):* Duty Managers responsible for day-to-day flight cancellations and crew allocation.
+* *Fleet Strategy Committee:* Executives deciding on aircraft retirement and new purchases.
+* *Safety & Compliance Board:* Auditors monitoring operational safety margins during adverse conditions.
 
+* **Business Benefits:**
+* *Proactive Delay Mitigation:* Shifts operations from "reactive" (dealing with a delay after it happens) to "proactive" (positioning backup crews at high-risk hubs like JFK before the storm hits).
+* *Capital Efficiency:* Provides data-driven evidence to prioritize the replacement of aging aircraft (>20 years), which are proven to be 7x more vulnerable to operational disruption.
+* *Enhanced Safety:* Quantifies the specific risk of night-time operations, allowing for smarter scheduling of less experienced pilots during daylight hours.
+
+*  **Key Performance Indicators (KPIs):**
+### **KPI 1: Hub Vulnerability Index (Operational Resilience)**
+* **Business Goal:** Determines where to station reserve crews and spare aircraft.
+### **KPI 2: Fleet Vulnerability (Strategic Asset Management)**
+* **Business Goal:** Validates the operational penalty of using older aircraft.
+### **KPI 3: Solar Cycle Impact (Safety Margins)**
+* **Business Goal:** Validates the safety impact of low-visibility scheduling.
+### **KPI 4: Model Sensitivity (Analytical Validation) (additional) **
+* **Definition:** Pearson Correlation Coefficient between inputs (Weather/Age) and output (Risk Score).
 ---
 
 ## 3. Technical Architecture
-The solution utilizes a serverless AWS architecture to ensure scalability and low maintenance.
-
-1.  **Ingestion (Automated):**
-    * **AWS Lambda:** Python script fetches live data from **Open-Meteo API** (Weather) and **Sunrise-Sunset API** (Solar).
-    * **Amazon EventBridge:** Triggers the ingestion process every 5 minutes, creating a real-time historical record.
-2.  **Storage (Data Lake):**
-    * **Amazon S3:** Organized into `Raw` (JSON/CSV) and `Curated` (Parquet) zones. The pipeline handles timestamped versioning.
-3.  **Processing (ETL):**
-    * **AWS Glue (PySpark):** Performs a complex **4-Way Join** across Flight Schedules, Fleet Metadata, Weather, and Solar datasets.
-    * **Logic Engine:** Implements a custom risk scoring algorithm based on variable thresholds.
-4.  **Analytics:**
-    * **Amazon Athena:** SQL-based query engine used to derive KPIs and statistical correlations.
-
+1.  **Ingestion (AWS Lambda + EventBridge):**
+    * **Function:** Triggers every 5 minutes to fetch live data from **Open-Meteo API** (Weather) and **Sunrise-Sunset API** (Solar).
+    * **Business Goal:** Ensures the model is always running on real-time data, not stale static files.
+2.  **Storage (Amazon S3):**
+    * **Structure:** Data is partitioned into `Raw` (JSON/CSV) for audit trails and `Curated` (Parquet) for analytics.
+    * **Cost Efficiency:** S3 Standard allows for massive scalability at low cost (~$0.023/GB).
+3.  **Processing (AWS Glue - PySpark):**
+    * **Logic:** A serverless ETL job performs a **4-Way Join** (Flights + Fleet + Weather + Solar). It applies a custom "Risk Scoring Algorithm" that penalizes flights based on Wind Speed, Plane Age, and Darkness.
+4.  **Analytics (Amazon Athena):**
+    * **Function:** SQL-based query used to generate the KPIs
 ---
 
-## 4. Evidence of Automation
-**Objective:** Address feedback regarding manual triggers by demonstrating a fully automated ingestion pipeline.
+## 4. Implementation & Code Execution
+The project implementation followed a strict CI/CD workflow.
 
-* **Evidence:** Amazon S3 Timestamped Storage.
-* **Description:** The data ingestion pipeline utilizes **AWS EventBridge** to trigger a **Lambda function** on a strict 5-minute schedule. As shown in the S3 evidence below, the system autonomously builds a historical record of weather conditions without human intervention. This ensures the model always runs on the latest environmental data rather than a static, manually uploaded dataset.
+### **A. Code Structure**
+* `src/lambda_function.py`: Python script handling API authentication and JSON buffering.
+* `src/glue_job.py`: PySpark script containing the complex transformation logic:
+* *Logic Interpretation:* We explicitly chose to weight **Wind Speed (40 points)** higher than **Plane Age (30 points)** because weather is an uncontrollable external factor, whereas fleet allocation is controllable. The **Night Penalty (10 points)** acts as a tie-breaker for marginal cases.
+    ```python
+    # Logic defining the Multi-Variate Risk Score
+    df_scored = df_calc.withColumn("risk_score",
+        (when(col("plane_age") > 20, 30).otherwise(0)) +      # Fleet Penalty
+        (when(col("windspeed") > 15, 40).otherwise(0)) +      # Weather Penalty
+        (when(col("scheduled_arr") > "18:00", 10).otherwise(0)) # Night Penalty
+    )
+    ```
+* `athena_queries.sql`: The SQL queries used to extract the KPIs above.
 
-*(Place your Screenshot 1 here: The S3 folder showing multiple files like `weather_...19:43`, `weather_...19:48`)*
+  ### **B. Interpretation of Results**
+The execution of the pipeline processed a sample dataset of international flights. The results confirm that the **"Compound Risk" hypothesis** is true: flights are rarely delayed by one factor alone. The highest scores (e.g., DUB at 70.0) occurred only when **Old Planes** met **Bad Weather** during **Night** hours. This multi-variate insight is invisible to legacy systems that look at these data points in isolation.
 
----
 
-## 5. Evidence of Complexity (Multi-Variate Logic)
-**Objective:** Demonstrate that the project goes beyond simple data lookup by implementing a multi-variate risk scoring algorithm.
+## 5. Results & Validation
 
-* **Logic:** The core processing engine (AWS Glue) performs a **4-Way Join** combining Internal Data (Fleet, Schedules) with External APIs (Weather, Solar).
-* **Code Snippet:** The following PySpark logic demonstrates how disparate data sources are weighted to calculate a final composite `Risk_Score`:
-
-```python
-# AWS Glue (PySpark) Risk Logic
-df_scored = df_calc.withColumn("risk_score", 
-    (when(col("plane_age") > 20, 30).otherwise(0)) +        # Factor 1: Fleet Health (Internal CSV)
-    (when(col("windspeed") > 15, 40).otherwise(0)) +        # Factor 2: Weather Severity (External API)
-    (when(col("scheduled_arr") > "18:00", 10).otherwise(0)) # Factor 3: Solar/Night Cycle (Computed Logic)
-)
-```
-## 7. Key Performance Indicators (KPIs) & Validation
-
-### KPI 1: Operational Action ("The Red Alert List")
-* **Goal:** Provide Operations teams with a prioritized list of specific flights requiring immediate intervention.
+### KPI 1: Hub Vulnerability Index (Operational Strategy)
+* **Goal:** Move beyond single-flight alerts to identify Systemic Network Failures. This KPI aggregates risk across entire hubs to answer: "Where should we station our backup crews to prevent network-wide collapse?"
 * **SQL Query:**
     ```sql
-    SELECT flight_id, origin, destination, risk_score, prediction, 
-           CASE WHEN risk_score > 40 THEN 'Review Weather & Crew' ELSE 'Standard Ops' END as action
-    FROM risk_report
-    ORDER BY risk_score DESC LIMIT 10;
+    SELECT origin as hub_airport, COUNT(*) as total_departures,
+    ROUND(SUM(CASE WHEN prediction = 'HIGH_RISK' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as high_risk_percentage,
+    -- Vulnerability Score = Average Risk * Volume
+    ROUND(AVG(risk_score), 1) as avg_hub_risk,
+    SUM(risk_score) as total_accumulated_risk
+   FROM risk_report
+   GROUP BY origin
+   HAVING COUNT(*) > 50 
+   ORDER BY total_accumulated_risk DESC;
     ```
-* **Result (Evidence):** The query successfully identified specific flights (e.g., flight `DL109`) with **Risk Scores > 40**, flagging them for "Review Weather & Crew".
-* **Verdict:** **Satisfied.** The system replaces manual guessing with a concrete, actionable checklist for the Operations Control Center.
- ![Results_second](screenshots/first_query.png)
+* **Result (Evidence):**
+* JFK (New York) is the Primary Network Vulnerability. With a Total Accumulated Risk of 21,780, it represents the largest operational threat due to the sheer volume of "Medium-High" risk flights (33.3% High Risk).
+* DUB (Dublin) is the Highest Intensity Risk. While it has fewer flights, it holds a staggering 70.0 Average Risk Score with 100% of flights flagged as High Risk, likely driven by severe local weather events.
+* **Actions:**Operations should deploy Volume Reserves to JFK (to handle mass delays) and Specialist Tech Crews to Dublin.
+ ![Results_second](screenshots/kpi-first.png)
 
 
-**Finding #1:** Day vs. Night Operational Risk
-**Objective:** Statistically validate the impact of the Solar/Night logic on operational safety.
-
-**Hypothesis:** Flights operating post-sunset carry higher operational risk due to reduced visibility and temperature drops.
-
-
+### KPI 2: Strategic Asset Management (Fleet Vulnerability) 
+* **Goal:** Assess whether older aircraft are disproportionately driving operational risk, providing data-backed support for fleet renewal decisions.
+* **SQL Query:**
 ```SQL
 
+SELECT 
+    CASE 
+        WHEN plane_age > 20 THEN 'Aging Fleet (>20y)'
+        WHEN plane_age BETWEEN 10 AND 20 THEN 'Mid-Life (10-20y)'
+        ELSE 'Modern Fleet (<10y)'
+    END as fleet_generation,
+    COUNT(*) as flight_count,
+    ROUND(AVG(risk_score), 1) as avg_risk_score
+FROM risk_report
+GROUP BY 
+    CASE 
+        WHEN plane_age > 20 THEN 'Aging Fleet (>20y)'
+        WHEN plane_age BETWEEN 10 AND 20 THEN 'Mid-Life (10-20y)'
+        ELSE 'Modern Fleet (<10y)'
+    END
+ORDER BY avg_risk_score DESC;
+```
+
+* **Result (Evidence):**
+* The analysis reveals a stark contrast in risk profiles based on aircraft age:
+* Aging Fleet (>20y): Carries a dangerously high Average Risk Score of 37.1 across 2,541 flights.
+* Modern Fleet (<10y): Maintains a minimal Average Risk Score of 5.3.
+* This data proves that planes over 20 years old are ~7x riskier to operate than modern aircraft under similar conditions, likely due to the "Aging Penalty" logic in the risk engine compounding with weather factors.
+ ![Results_first](screenshots/second-kpi.png)
+
+### KPI 3: Day vs. Night Operational Risk (Solar Impact)
+* **Goal:** Quantify the increased safety risk of night-time operations to validate the necessity of the Solar/Sunset API integration.
+* **SQL Query:**
+```SQL
 SELECT 
     CASE 
         WHEN scheduled_arr > '18:00' THEN 'Night Operation'
@@ -93,17 +134,37 @@ FROM risk_report
 GROUP BY 1
 ORDER BY avg_risk DESC;
 ```
+* **Result (Evidence):**
+* Night Operations (Post-18:00): Show an Average Risk Score of 21.8.
+* Day Operations: Show an Average Risk Score of 13.5.
+* This 61% increase in operational risk at night confirms that reduced visibility and lower temperatures (typical of night hours) act as risk multipliers. Additionally, nearly 10% of all night flights (121 out of 1,331) triggered a "High Risk" critical alert, compared to only 5% of day flights.
 
-*Analysis of Results:* To validate the impact of the Solar API integration, we compared operational risk during daylight versus post-sunset hours. The analysis reveals a significant disparity:
-Night Operations carry an Average Risk Score of 21.8.
-Day Operations carry an Average Risk Score of 13.5.
-This 61% increase in risk during night operations proves that visibility and temperature drops (derived from the Solar/Weather APIs) are critical drivers of potential delays. Operations teams should prioritize the 121 'Critical Alerts' identified in the night block.
+ ![Results_first](screenshots/third-kpi.png)
 
- ![Results_first](screenshots/first_query.png)
-
-
- 
-**Finding #2:** Weather Sensitivity
-**Objective:** Prove the model is dynamic and responds to real-world environmental changes.
-
+### KPI 4: Analytical Validity (Weather Sensitivity)
+* **Goal:** Statistically prove that the "Risk Score" is not random, but is directly driven by the input variables (Wind and Plane Age)
+* **SQL Query:**
 ```SQL
+SELECT 
+    CORR(windspeed, risk_score) as weather_correlation,
+    CORR(plane_age, risk_score) as fleet_age_correlation
+FROM risk_report;
+```
+* **Result (Evidence):**
+* Weather Impact (0.59): A moderate-to-strong positive correlation. This confirms that as wind speed rises, the risk score consistently increases.
+* Fleet Age Impact (0.70): A strong positive correlation. This reveals that in the current dataset, the "Aging Fleet" penalty is the slightly more dominant driver of risk compared to weather.
+
+ ![Results_first](screenshots/fourth-kpi.png)
+
+
+ ## 6. Conclusion
+The **Delta 360° Flight Risk Engine** successfully demonstrates how Cloud-Native technologies can solve complex operational problems. By moving beyond simple weather tracking to a **multi-variate risk model**, the project provided three key insights:
+1.  **Night Operations** are 61% riskier than day flights, validating the need for solar data.
+2.  **Aging Aircraft** (>20 years) are significantly more vulnerable to delays, supporting fleet renewal strategies.
+3.  **Hub Vulnerability** metrics identified JFK as the network's primary volume risk.
+
+This project proves that with a minimal cloud spend (~$0.52/month), legacy airline operations can be transformed into proactive, data-driven decision engines.
+
+
+## 7. Contributors
+* **Nurgul Amirkhan** - mglgx7
