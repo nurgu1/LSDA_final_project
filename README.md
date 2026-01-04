@@ -55,8 +55,8 @@ The pipeline is designed to be "Serverless," meaning costs are only incurred whe
 The project implementation followed a strict CI/CD workflow.
 
 ### **A. Code Structure**
-* `src/lambda_function.py`: Python script handling API authentication and JSON buffering.
-* `src/glue_job.py`: PySpark script containing the complex transformation logic:
+* `lambda.py`: Python script handling API authentication and JSON buffering.
+* `glue-job.py`: PySpark script containing the complex transformation logic:
 * *Logic Interpretation:* We explicitly chose to weight **Wind Speed (40 points)** higher than **Plane Age (30 points)** because weather is an uncontrollable external factor, whereas fleet allocation is controllable. The **Night Penalty (10 points)** acts as a tie-breaker for marginal cases.
     ```python
     # Logic defining the Multi-Variate Risk Score
@@ -91,7 +91,8 @@ The execution of the pipeline processed a sample dataset of international flight
 * **Result (Evidence):**
 * JFK (New York) is the Primary Network Vulnerability. With a Total Accumulated Risk of 21,780, it represents the largest operational threat due to the sheer volume of "Medium-High" risk flights (33.3% High Risk).
 * DUB (Dublin) is the Highest Intensity Risk. While it has fewer flights, it holds a staggering 70.0 Average Risk Score with 100% of flights flagged as High Risk, likely driven by severe local weather events.
-* **Actions:**Operations should deploy Volume Reserves to JFK (to handle mass delays) and Specialist Tech Crews to Dublin.
+* **Actions:** Operations should deploy Volume Reserves to JFK (to handle mass delays) and Specialist Tech Crews to Dublin.
+  
  ![Results_1](screenshots/kpi-first.png)
 
 
