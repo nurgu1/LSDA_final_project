@@ -1,4 +1,4 @@
-# Delta 360° Flight Risk Engine (D-FRE) ✈️
+# Flight Risk Engine 
 
 ## 1. Project Overview
 The **Delta 360° Flight Risk Engine** is a cloud-native data pipeline designed to proactively predict flight delays. Unlike traditional models that analyze weather in isolation, this engine implements a **multi-variate risk model** that correlates real-time environmental data, solar cycles, and aircraft fleet health.
@@ -85,7 +85,7 @@ The execution of the pipeline processed a sample dataset of international flight
 * JFK (New York) is the Primary Network Vulnerability. With a Total Accumulated Risk of 21,780, it represents the largest operational threat due to the sheer volume of "Medium-High" risk flights (33.3% High Risk).
 * DUB (Dublin) is the Highest Intensity Risk. While it has fewer flights, it holds a staggering 70.0 Average Risk Score with 100% of flights flagged as High Risk, likely driven by severe local weather events.
 * **Actions:**Operations should deploy Volume Reserves to JFK (to handle mass delays) and Specialist Tech Crews to Dublin.
- ![Results_second](screenshots/kpi-first.png)
+ ![Results_1](screenshots/kpi-first.png)
 
 
 ### KPI 2: Strategic Asset Management (Fleet Vulnerability) 
@@ -116,7 +116,7 @@ ORDER BY avg_risk_score DESC;
 * Aging Fleet (>20y): Carries a dangerously high Average Risk Score of 37.1 across 2,541 flights.
 * Modern Fleet (<10y): Maintains a minimal Average Risk Score of 5.3.
 * This data proves that planes over 20 years old are ~7x riskier to operate than modern aircraft under similar conditions, likely due to the "Aging Penalty" logic in the risk engine compounding with weather factors.
- ![Results_first](screenshots/second-kpi.png)
+ ![Results_2](screenshots/second-kpi.png)
 
 ### KPI 3: Day vs. Night Operational Risk (Solar Impact)
 * **Goal:** Quantify the increased safety risk of night-time operations to validate the necessity of the Solar/Sunset API integration.
@@ -139,7 +139,7 @@ ORDER BY avg_risk DESC;
 * Day Operations: Show an Average Risk Score of 13.5.
 * This 61% increase in operational risk at night confirms that reduced visibility and lower temperatures (typical of night hours) act as risk multipliers. Additionally, nearly 10% of all night flights (121 out of 1,331) triggered a "High Risk" critical alert, compared to only 5% of day flights.
 
- ![Results_first](screenshots/third-kpi.png)
+ ![Results_3](screenshots/third-kpi.png)
 
 ### KPI 4: Analytical Validity (Weather Sensitivity)
 * **Goal:** Statistically prove that the "Risk Score" is not random, but is directly driven by the input variables (Wind and Plane Age)
@@ -154,7 +154,6 @@ FROM risk_report;
 * Weather Impact (0.59): A moderate-to-strong positive correlation. This confirms that as wind speed rises, the risk score consistently increases.
 * Fleet Age Impact (0.70): A strong positive correlation. This reveals that in the current dataset, the "Aging Fleet" penalty is the slightly more dominant driver of risk compared to weather.
 
- ![Results_first](screenshots/fourth-kpi.png)
 
 
  ## 6. Conclusion
