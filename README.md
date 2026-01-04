@@ -10,25 +10,22 @@ By automating the ingestion of live weather and solar data and joining it with i
 ## 2. Business Value & Problem Statement
 * **The Problem:** Legacy flight tracking systems often fail to account for the "compounding risk" of aging aircraft operating in marginal weather conditions or during low-visibility night operations.
 * **The Solution:** An automated "Lakehouse" architecture that merges static internal data with dynamic external APIs.
-* **Target Audience:**
-* *Operations Control Center (OCC):* Duty Managers responsible for day-to-day flight cancellations and crew allocation.
-* *Fleet Strategy Committee:* Executives deciding on aircraft retirement and new purchases.
-* *Safety & Compliance Board:* Auditors monitoring operational safety margins during adverse conditions.
 
-* **Business Benefits:**
-* *Proactive Delay Mitigation:* Shifts operations from "reactive" (dealing with a delay after it happens) to "proactive" (positioning backup crews at high-risk hubs like JFK before the storm hits).
-* *Capital Efficiency:* Provides data-driven evidence to prioritize the replacement of aging aircraft (>20 years), which are proven to be 7x more vulnerable to operational disruption.
-* *Enhanced Safety:* Quantifies the specific risk of night-time operations, allowing for smarter scheduling of less experienced pilots during daylight hours.
+### **Target Audience**
+* **Operations Control Center (OCC):** Duty Managers responsible for day-to-day flight cancellations and crew allocation.
+* **Fleet Strategy Committee:** Executives deciding on aircraft retirement and new purchases.
+* **Safety & Compliance Board:** Auditors monitoring operational safety margins during adverse conditions.
 
-*  **Key Performance Indicators (KPIs):**
-### **KPI 1: Hub Vulnerability Index (Operational Resilience)**
-* **Business Goal:** Determines where to station reserve crews and spare aircraft.
-### **KPI 2: Fleet Vulnerability (Strategic Asset Management)**
-* **Business Goal:** Validates the operational penalty of using older aircraft.
-### **KPI 3: Solar Cycle Impact (Safety Margins)**
-* **Business Goal:** Validates the safety impact of low-visibility scheduling.
-### **KPI 4: Model Sensitivity (Analytical Validation) (additional) **
-* **Definition:** Pearson Correlation Coefficient between inputs (Weather/Age) and output (Risk Score).
+### **Business Benefits**
+* **Proactive Delay Mitigation:** Shifts operations from "reactive" (dealing with a delay after it happens) to "proactive" (positioning backup crews at high-risk hubs like JFK before the storm hits).
+* **Capital Efficiency:** Provides data-driven evidence to prioritize the replacement of aging aircraft (>20 years), which are proven to be 7x more vulnerable to operational disruption.
+* **Enhanced Safety:** Quantifies the specific risk of night-time operations, allowing for smarter scheduling of less experienced pilots during daylight hours.
+
+### **Key Performance Indicators (KPIs)**
+* **KPI 1: Hub Vulnerability Index:** Determines where to station reserve crews.
+* **KPI 2: Fleet Vulnerability:** Validates the operational penalty of using older aircraft.
+* **KPI 3: Solar Cycle Impact:** Validates the safety impact of low-visibility scheduling.
+* **KPI 4: Model Sensitivity:** Analytical validation using Pearson Correlation.
 ---
 
 ## 3. Technical Architecture
@@ -42,6 +39,16 @@ By automating the ingestion of live weather and solar data and joining it with i
     * **Logic:** A serverless ETL job performs a **4-Way Join** (Flights + Fleet + Weather + Solar). It applies a custom "Risk Scoring Algorithm" that penalizes flights based on Wind Speed, Plane Age, and Darkness.
 4.  **Analytics (Amazon Athena):**
     * **Function:** SQL-based query used to generate the KPIs
+    
+### **Cost Analysis (Estimated)**
+The pipeline is designed to be "Serverless," meaning costs are only incurred when code is running.
+| Service | Usage Estimate | Cost (Monthly) |
+| :--- | :--- | :--- |
+| **AWS Lambda** | Ingestion triggers every 5 mins (8,760 invocations/mo) | **$0.02** |
+| **Amazon S3** | Storage of Raw JSON + Curated Parquet (< 1GB) | **$0.05** |
+| **AWS Glue** | PySpark ETL Jobs (On-demand execution) | **$0.44** |
+| **Amazon Athena** | Ad-hoc SQL queries for KPI generation | **$0.01** |
+| **TOTAL** | **Estimated Monthly Operating Cost** | **~$0.52** |
 ---
 
 ## 4. Implementation & Code Execution
