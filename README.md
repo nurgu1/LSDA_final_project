@@ -1,31 +1,35 @@
 # Flight Risk Engine 
 
 ## 1. Project Overview
-The **Delta 360° Flight Risk Engine** is a cloud-native data pipeline designed to proactively predict flight delays. Unlike traditional models that analyze weather in isolation, this engine implements a **multi-variate risk model** that correlates real-time environmental data, solar cycles, and aircraft fleet health.
+A serverless system that predicts flight delays by modeling compound operational risk (fleet age × weather × night operations).
 
 By automating the ingestion of live weather and solar data and joining it with internal flight schedules, the system produces a weighted **Risk Score (0-100)** for every upcoming flight, enabling Operations teams to prioritize interventions before delays occur.
 
 ---
 
 ## 2. Business Value & Problem Statement
-* **The Problem:** Legacy flight tracking systems often fail to account for the "compounding risk" of aging aircraft operating in marginal weather conditions or during low-visibility night operations.
-* **The Solution:** An automated "Lakehouse" architecture that merges static internal data with dynamic external APIs.
+* **The Problem:** Legacy airline systems evaluate weather, aircraft condition, and schedules in isolation. This prevents airlines from identifying compound risk scenarios, such as aging aircraft operating at night in marginal weather until delays have already occurred.This leads to reactive cancellations, inefficient crew allocation, and avoidable passenger disruption.
 
-### **Target Audience**
-* **Operations Control Center (OCC):** Duty Managers responsible for day-to-day flight cancellations and crew allocation.
-* **Fleet Strategy Committee:** Executives deciding on aircraft retirement and new purchases.
-* **Safety & Compliance Board:** Auditors monitoring operational safety margins during adverse conditions.
-
+### **Stakeholder	Role**
+* **Operations Control Center (OCC)** - Manages day-to-day flight operations, delays, and crew allocation
+* **Fleet Strategy Team ** - Decides aircraft retirement, replacement, and long-term capital investments
+* **Safety & Compliance Teams** -	Monitor operational safety under adverse conditions
+* **Passengers (Indirect)**	Benefit from improved schedule reliability and fewer delays
+  
 ### **Business Benefits**
-* **Proactive Delay Mitigation:** Shifts operations from "reactive" (dealing with a delay after it happens) to "proactive" (positioning backup crews at high-risk hubs like JFK before the storm hits).
-* **Capital Efficiency:** Provides data-driven evidence to prioritize the replacement of aging aircraft (>20 years), which are proven to be 7x more vulnerable to operational disruption.
-* **Enhanced Safety:** Quantifies the specific risk of night-time operations, allowing for smarter scheduling of less experienced pilots during daylight hours.
-
+* **Problem: Reactive delay management** -	Value: Enables proactive intervention (backup crews, schedule buffers)
+* **Problem: Unclear impact of aging aircraft**	- Value: Quantifies fleet vulnerability, supporting retirement decisions
+* **Hidden night-time operational risk** - Value:	Measures day vs. night risk differentials
+* **Fragmented data sources** - Value:	Creates a single, unified risk signal
 ### **Key Performance Indicators (KPIs)**
-* **KPI 1: Hub Vulnerability Index:** Determines where to station reserve crews.
-* **KPI 2: Fleet Vulnerability:** Validates the operational penalty of using older aircraft.
-* **KPI 3: Solar Cycle Impact:** Validates the safety impact of low-visibility scheduling.
-* **KPI 4: Model Sensitivity:** Analytical validation using Pearson Correlation.
+KPI 1: Hub Vulnerability Index — Where to pre-position backup crews
+
+KPI 2: Fleet Vulnerability Score — Which aircraft to retire first
+
+KPI 3: Day vs Night Risk Differential (Solar Impact) — How risky night ops are
+
+KPI 4: Compound Risk Failure Rate — Validates multi-factor risk compounding
+
 ---
 
 ## 3. Technical Architecture
@@ -36,7 +40,7 @@ By automating the ingestion of live weather and solar data and joining it with i
     * **Structure:** Data is partitioned into `Raw` (JSON/CSV) for audit trails and `Curated` (Parquet) for analytics.
     * **Cost Efficiency:** S3 Standard allows for massive scalability at low cost (~$0.023/GB).
 3.  **Processing (AWS Glue - PySpark):**
-    * **Logic:** A serverless ETL job performs a **4-Way Join** (Flights + Fleet + Weather + Solar). It applies a custom "Risk Scoring Algorithm" that penalizes flights based on Wind Speed, Plane Age, and Darkness.
+    * **Logic:** A serverless ETL job performs a join (Flights + Fleet + Weather + Solar). It applies a custom "Risk Scoring Algorithm" that penalizes flights based on Wind Speed, Plane Age, and Darkness.
 4.  **Analytics (Amazon Athena):**
     * **Function:** SQL-based query used to generate the KPIs
     
@@ -52,8 +56,6 @@ The pipeline is designed to be "Serverless," meaning costs are only incurred whe
 ---
 
 ## 4. Implementation & Code Execution
-The project implementation followed a strict CI/CD workflow.
-
 ### **A. Code Structure**
 * `lambda.py`: Python script handling API authentication and JSON buffering.
 * `glue-job.py`: PySpark script containing the complex transformation logic:
@@ -72,21 +74,19 @@ The project implementation followed a strict CI/CD workflow.
 The execution of the pipeline processed a sample dataset of international flights. The results confirm that the **"Compound Risk" hypothesis** is true: flights are rarely delayed by one factor alone. The highest scores (e.g., DUB at 70.0) occurred only when **Old Planes** met **Bad Weather** during **Night** hours. This multi-variate insight is invisible to legacy systems that look at these data points in isolation.
 
    ### **C. Data Integration Strategy (The 4-Way Join)**
-Unlike simple ELT pipelines that rely on expensive SQL joins at query time (e.g., `CROSS JOIN UNNEST`), this project implements a robust **ETL (Extract, Transform, Load)** strategy using **PySpark**. 
-
-By pre-joining the data in the processing layer, we created a "Schema-on-Write" architecture that reduces Athena query costs by ~40% and improves dashboard performance.
-
+This project implements a robust **ETL (Extract, Transform, Load)** strategy using **PySpark**. 
+By pre-joining the data in the processing layer, we created a "Schema-on-Write" architecture.
 **The Join Logic:**
 The `glue_job.py` script executes a **4-Way Left Join** to preserve operational data integrity:
 1.  **Base Layer:** `Flights.csv` (The primary fact table).
 2.  **Asset Layer:** Joined with `Fleet_Metadata.csv` on `tail_number` to inject aircraft age.
 3.  **Environmental Layer:** Joined with `Weather_API.json` on `airport_code` + `timestamp` (using a 1-hour rolling window).
-4.  **Solar Layer:** Joined with `Solar_API.json` on `date` to determine Civil Twilight times.
+4.  **Solar Layer:** Joined with `Solar_API.json` on `date` to determine twilight times.
 
 ## 5. Results & Validation
 
 ### KPI 1: Hub Vulnerability Index (Operational Strategy)
-* **Goal:** Move beyond single-flight alerts to identify Systemic Network Failures. This KPI aggregates risk across entire hubs to answer: "Where should we station our backup crews to prevent network-wide collapse?"
+* **Definition:** Aggregated risk score weighted by flight volume at each airport
 * **SQL Query:**
     ```sql
     SELECT origin as hub_airport, COUNT(*) as total_departures,
@@ -99,7 +99,7 @@ The `glue_job.py` script executes a **4-Way Left Join** to preserve operational 
    HAVING COUNT(*) > 50 
    ORDER BY total_accumulated_risk DESC;
     ```
-* **Result (Evidence):**
+* **Result**
 * JFK (New York) is the Primary Network Vulnerability. With a Total Accumulated Risk of 21,780, it represents the largest operational threat due to the sheer volume of "Medium-High" risk flights (33.3% High Risk).
 * DUB (Dublin) is the Highest Intensity Risk. While it has fewer flights, it holds a staggering 70.0 Average Risk Score with 100% of flights flagged as High Risk, likely driven by severe local weather events.
 * **Actions:** Operations should deploy Volume Reserves to JFK (to handle mass delays) and Specialist Tech Crews to Dublin.
@@ -108,7 +108,7 @@ The `glue_job.py` script executes a **4-Way Left Join** to preserve operational 
 
 
 ### KPI 2: Strategic Asset Management (Fleet Vulnerability) 
-* **Goal:** Assess whether older aircraft are disproportionately driving operational risk, providing data-backed support for fleet renewal decisions.
+* **Definition:** Average risk score grouped by aircraft age category
 * **SQL Query:**
 ```SQL
 
@@ -138,7 +138,7 @@ ORDER BY avg_risk_score DESC;
  ![Results_2](screenshots/second-kpi.png)
 
 ### KPI 3: Day vs. Night Operational Risk (Solar Impact)
-* **Goal:** Quantify the increased safety risk of night-time operations to validate the necessity of the Solar/Sunset API integration.
+* **Definition:** Comparison of average risk scores between day and night operations
 * **SQL Query:**
 ```SQL
 SELECT 
@@ -154,14 +154,13 @@ GROUP BY 1
 ORDER BY avg_risk DESC;
 ```
 * **Result (Evidence):**
-* Night Operations (Post-18:00): Show an Average Risk Score of 21.8.
-* Day Operations: Show an Average Risk Score of 13.5.
-* This 61% increase in operational risk at night confirms that reduced visibility and lower temperatures (typical of night hours) act as risk multipliers. Additionally, nearly 10% of all night flights (121 out of 1,331) triggered a "High Risk" critical alert, compared to only 5% of day flights.
-
+Insight: Night operations increase average risk by 61%
+Evidence: Avg risk rises from 13.5 (day) to 21.8 (night)
+Action: Limit older aircraft on post-18:00 routes
  ![Results_3](screenshots/third-kpi.png)
 
-### KPI 4: Compound Risk Severity (The "Perfect Storm" Analysis)
-* **Goal:** Validate the multi-variate nature of the engine by isolating extreme scenarios. This stress-test compares the "Best Case" operational environment against the "Worst Case" to prove that risks compound rather than exist in isolation.
+### KPI 4: Compound Risk Failure Rate
+* **Goal:** Percentage of high-risk flights under ideal vs. adverse compound conditions
 * **SQL Query:**
     ```sql
     SELECT 
@@ -196,11 +195,10 @@ ORDER BY avg_risk DESC;
 
 
  ## 6. Conclusion
-The **Delta 360° Flight Risk Engine** successfully demonstrates how Cloud-Native technologies can solve complex operational problems. By moving beyond simple weather tracking to a **multi-variate risk model**, the project provided three key insights:
-1.  **Night Operations** are 61% riskier than day flights, validating the need for solar data.
-2.  **Aging Aircraft** (>20 years) are significantly more vulnerable to delays, supporting fleet renewal strategies.
-3.  **Hub Vulnerability** metrics identified JFK as the network's primary volume risk.
-
+Night operations show a 61% higher average risk compared to daytime flights.
+Aircraft older than 20 years exhibit approximately 7× higher risk than modern aircraft.
+High-risk scenarios emerge only when multiple factors combine, confirming the compound risk hypothesis.
+Flights under ideal conditions consistently score 0 risk, validating model precision and absence of noise.
 This project proves that with a minimal cloud spend (~$0.52/month), legacy airline operations can be transformed into proactive, data-driven decision engines.
 
 
