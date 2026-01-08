@@ -67,9 +67,15 @@ GROUP BY 1
 ORDER BY avg_risk DESC;
 
 
--- KPI 4: Analytical Validity (Model Sensitivity)
--- Goal: Statistical validation using Pearson Correlation.
 SELECT 
-    CORR(windspeed, risk_score) as weather_correlation,
-    CORR(plane_age, risk_score) as fleet_age_correlation
-FROM risk_report;
+    CASE 
+        WHEN plane_age > 20 AND scheduled_arr > '18:00' AND windspeed > 15 THEN 'The Perfect Storm (Old+Night+Wind)'
+        WHEN plane_age < 10 AND scheduled_arr <= '18:00' AND windspeed < 10 THEN 'Ideal Conditions (New+Day+Calm)'
+        ELSE 'Normal Operations'
+    END as flight_scenario,
+    COUNT(*) as total_flights,
+    ROUND(AVG(risk_score), 1) as avg_risk,
+    ROUND(CAST(SUM(CASE WHEN prediction = 'HIGH_RISK' THEN 1 ELSE 0 END) AS DOUBLE) * 100 / COUNT(*), 1) as failure_rate_percent
+FROM risk_report
+GROUP BY 1
+ORDER BY avg_risk DESC;
