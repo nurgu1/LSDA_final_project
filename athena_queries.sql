@@ -1,9 +1,6 @@
 
--- 1. Clean up previous versions of the table
 DROP TABLE IF EXISTS risk_report;
-
--- 2. Create the External Table schema pointing to S3 Parquet data
--- Note: Replace [YOUR-BUCKET-NAME] with your actual S3 bucket name
+-- Create the External Table schema pointing to S3 Parquet data
 CREATE EXTERNAL TABLE IF NOT EXISTS risk_report (
   flight_id STRING,
   origin STRING,
@@ -20,10 +17,6 @@ CREATE EXTERNAL TABLE IF NOT EXISTS risk_report (
 STORED AS PARQUET
 LOCATION 's3://flight-delay-project-mglgx7/curated/risk_report/';
 
-
--- -------------------------------------------------------
--- PART 2: KEY PERFORMANCE INDICATORS (KPIs)
--- -------------------------------------------------------
 
 -- KPI 1: Hub Vulnerability Index (Operational Strategy)
 -- Goal: Identify high-risk network hubs to prioritize crew allocation.
